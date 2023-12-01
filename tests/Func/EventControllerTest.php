@@ -3,36 +3,49 @@
 namespace App\Tests\Func;
 
 use App\DataFixtures\EventFixtures;
-use App\Entity\Event;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Liip\TestFixturesBundle\Services\DatabaseToolCollection;
 use Liip\TestFixturesBundle\Services\DatabaseTools\AbstractDatabaseTool;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class EventControllerTest extends WebTestCase
 {
     protected AbstractDatabaseTool $databaseTool;
-    private static $client;
+    private static KernelBrowser $client;
 
     protected function setUp(): void
     {
-        static::$client = static::createClient();
+        self::$client = self::createClient();
 
-        $entityManager = static::getContainer()->get('doctrine.orm.entity_manager');
+        $entityManager = self::getContainer()->get('doctrine.orm.entity_manager');
+        if (!$entityManager instanceof EntityManagerInterface) {
+            throw new \LogicException(sprintf('Expected instance of "%s", instance of "%s" given', EntityManagerInterface::class, get_class($entityManager)));
+        }
+
         $metaData = $entityManager->getMetadataFactory()->getAllMetadata();
         $schemaTool = new SchemaTool($entityManager);
         $schemaTool->updateSchema($metaData);
 
-        $this->databaseTool = static::getContainer()->get(DatabaseToolCollection::class)->get();
+        $databaseToolCollection = self::getContainer()->get(DatabaseToolCollection::class);
+        if (!$databaseToolCollection instanceof DatabaseToolCollection) {
+            throw new \LogicException(sprintf('Expected instance of "%s", instance of "%s" given', DatabaseToolCollection::class, get_class($entityManager)));
+        }
+
+        $this->databaseTool = $databaseToolCollection->get();
 
         $this->databaseTool->loadFixtures(
             [EventFixtures::class]
         );
     }
 
-    public function testUpdateShouldReturnEmptyResponse()
+    public function testUpdateShouldReturnEmptyResponse(): void
     {
-        $client = static::$client;
+        $client = self::$client;
+
+        $value = json_encode(['comment' => 'It‘s a test comment !!!!!!!!!!!!!!!!!!!!!!!!!!!']);
+        $this->assertNotFalse($value);
 
         $client->request(
             'PUT',
@@ -40,16 +53,18 @@ class EventControllerTest extends WebTestCase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['comment' => 'It‘s a test comment !!!!!!!!!!!!!!!!!!!!!!!!!!!'])
+            $value
         );
 
         $this->assertResponseStatusCodeSame(204);
     }
 
-
-    public function testUpdateShouldReturnHttpNotFoundResponse()
+    public function testUpdateShouldReturnHttpNotFoundResponse(): void
     {
-        $client = static::$client;
+        $client = self::$client;
+
+        $value = json_encode(['comment' => 'It‘s a test comment !!!!!!!!!!!!!!!!!!!!!!!!!!!']);
+        $this->assertNotFalse($value);
 
         $client->request(
             'PUT',
@@ -57,7 +72,7 @@ class EventControllerTest extends WebTestCase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['comment' => 'It‘s a test comment !!!!!!!!!!!!!!!!!!!!!!!!!!!'])
+            $value
         );
 
         $this->assertResponseStatusCodeSame(404);
@@ -68,15 +83,17 @@ class EventControllerTest extends WebTestCase
               }
             JSON;
 
-        self::assertJsonStringEqualsJsonString($expectedJson, $client->getResponse()->getContent());
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        self::assertJsonStringEqualsJsonString($expectedJson, $content);
     }
 
     /**
      * @dataProvider providePayloadViolations
      */
-    public function testUpdateShouldReturnBadRequest(string $payload, string $expectedResponse)
+    public function testUpdateShouldReturnBadRequest(string $payload, string $expectedResponse): void
     {
-        $client = static::$client;
+        $client = self::$client;
 
         $client->request(
             'PUT',
@@ -88,10 +105,14 @@ class EventControllerTest extends WebTestCase
         );
 
         self::assertResponseStatusCodeSame(400);
-        self::assertJsonStringEqualsJsonString($expectedResponse, $client->getResponse()->getContent());
-
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        self::assertJsonStringEqualsJsonString($expectedResponse, $content);
     }
 
+    /**
+     * @return iterable<string, string[]>
+     */
     public function providePayloadViolations(): iterable
     {
         yield 'comment too short' => [

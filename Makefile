@@ -109,3 +109,14 @@ func-test: var/docker.up ## Run PhpUnit functionnal testsuite
 	@$(call log,Running ...)
 	$(PHP_EXEC) bin/phpunit -v --testsuite func --testdox
 	@$(call log_success,Done)
+
+.PHONY: qa
+qa:
+	@$(call log,Running QA Tools ...)
+	@$(call log,Running php-cs-fixer for "src" ...)
+	@$(PHP_RUN) vendor/bin/php-cs-fixer fix --show-progress=dots src
+	@$(call log,Running php-cs-fixer for "tests" ...)
+	@$(PHP_RUN) vendor/bin/php-cs-fixer fix --show-progress=dots tests
+	@$(call log,Running phpstan ...)
+	@$(PHP_RUN) vendor/bin/phpstan analyse -l 8 src tests
+	@$(call log_success,Done)
